@@ -1,0 +1,23 @@
+meta {
+  name: delete-account
+  type: http
+  seq: 10
+}
+
+delete {
+  url: {{url}}/api/v1/me
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "password": "",
+    "grace_period_days": 0
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

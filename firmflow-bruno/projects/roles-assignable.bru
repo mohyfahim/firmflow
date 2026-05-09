@@ -1,0 +1,16 @@
+meta {
+  name: roles-assignable
+  type: http
+  seq: 16
+}
+
+get {
+  url: {{url}}/api/v1/projects/{{project_id}}/roles/assignable
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

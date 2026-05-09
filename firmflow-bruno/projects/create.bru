@@ -1,0 +1,23 @@
+meta {
+  name: create
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{url}}/api/v1/projects
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "My fleet",
+    "description": ""
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

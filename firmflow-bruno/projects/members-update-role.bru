@@ -1,0 +1,22 @@
+meta {
+  name: members-update-role
+  type: http
+  seq: 12
+}
+
+patch {
+  url: {{url}}/api/v1/projects/{{project_id}}/members/{{member_user_id}}
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "role_id": "{{role_id}}"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

@@ -1,0 +1,16 @@
+meta {
+  name: audit-logs
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{url}}/api/v1/projects/{{project_id}}/audit-logs?page=1&page_size=20
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

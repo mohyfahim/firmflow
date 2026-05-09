@@ -1,0 +1,22 @@
+meta {
+  name: 2fa-enable
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{url}}/api/v1/me/2fa/enable
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "password": ""
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

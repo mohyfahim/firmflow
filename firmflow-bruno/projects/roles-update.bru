@@ -1,0 +1,24 @@
+meta {
+  name: roles-update
+  type: http
+  seq: 18
+}
+
+patch {
+  url: {{url}}/api/v1/projects/{{project_id}}/roles/{{role_id}}
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "",
+    "description": "",
+    "permission_keys": ["project.read"]
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

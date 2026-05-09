@@ -1,0 +1,22 @@
+meta {
+  name: 2fa-confirm
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{url}}/api/v1/me/2fa/confirm
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "code": ""
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

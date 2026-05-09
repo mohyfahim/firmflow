@@ -1,0 +1,22 @@
+meta {
+  name: ownership-transfer
+  type: http
+  seq: 14
+}
+
+post {
+  url: {{url}}/api/v1/projects/{{project_id}}/ownership/transfer
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "new_owner_user_id": ""
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

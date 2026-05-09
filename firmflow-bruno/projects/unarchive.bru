@@ -1,0 +1,16 @@
+meta {
+  name: unarchive
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{url}}/api/v1/projects/{{project_id}}/unarchive
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

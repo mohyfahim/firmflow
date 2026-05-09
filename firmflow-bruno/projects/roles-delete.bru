@@ -1,0 +1,16 @@
+meta {
+  name: roles-delete
+  type: http
+  seq: 19
+}
+
+delete {
+  url: {{url}}/api/v1/projects/{{project_id}}/roles/{{role_id}}
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
