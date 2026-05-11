@@ -1,0 +1,24 @@
+meta {
+  name: device-groups-members-add
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{url}}/api/v1/projects/{{project_id}}/device-groups/{{group_id}}/members
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "device_ids": [
+      "{{device_id}}"
+    ]
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

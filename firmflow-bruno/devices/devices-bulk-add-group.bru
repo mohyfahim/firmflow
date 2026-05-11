@@ -1,0 +1,28 @@
+meta {
+  name: devices-bulk-add-group
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{url}}/api/v1/projects/{{project_id}}/devices/bulk
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "action": "add_to_group",
+    "apply_to_filter": false,
+    "filter": {},
+    "device_ids": [
+      "{{device_id}}"
+    ],
+    "group_id": "{{group_id}}"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

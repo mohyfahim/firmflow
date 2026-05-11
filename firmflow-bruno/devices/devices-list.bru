@@ -1,0 +1,16 @@
+meta {
+  name: devices-list
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{url}}/api/v1/projects/{{project_id}}/devices?page=1&page_size=20&sort=-created_at&q=&online=&blocked=&device_type_id=&group_id=&firmware_version=&last_seen_from=&last_seen_to=
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

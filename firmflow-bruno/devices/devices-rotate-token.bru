@@ -1,0 +1,16 @@
+meta {
+  name: devices-rotate-token
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{url}}/api/v1/projects/{{project_id}}/devices/{{device_id}}/rotate-token
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

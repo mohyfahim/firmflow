@@ -1,0 +1,22 @@
+meta {
+  name: device-types-patch
+  type: http
+  seq: 14
+}
+
+patch {
+  url: {{url}}/api/v1/projects/{{project_id}}/device-types/{{device_type_id}}
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "memory_notes": "Updated notes"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

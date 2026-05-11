@@ -1,0 +1,16 @@
+meta {
+  name: devices-unblock
+  type: http
+  seq: 20
+}
+
+post {
+  url: {{url}}/api/v1/projects/{{project_id}}/devices/{{device_id}}/unblock
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

@@ -14,6 +14,8 @@ type Deps struct {
 	Auth       *handlers.AuthHandler
 	AuthMW     gin.HandlerFunc
 	Project    *handlers.ProjectHandler
+	Device     *handlers.DeviceHandler
+	DeviceAuthMW gin.HandlerFunc
 	Authorizer *rbacsvc.Authorizer
 }
 
@@ -76,5 +78,35 @@ func Register(router *gin.Engine, deps Deps) {
 		pg.POST("/roles", middleware.RequireProjectPermission(deps.Authorizer, rbacperm.RoleCreate), deps.Project.CreateCustomRole)
 		pg.PATCH("/roles/:roleID", middleware.RequireProjectPermission(deps.Authorizer, rbacperm.RoleUpdate), deps.Project.UpdateCustomRole)
 		pg.DELETE("/roles/:roleID", middleware.RequireProjectPermission(deps.Authorizer, rbacperm.RoleDelete), deps.Project.DeleteCustomRole)
+
+		// Device types and devices (device.* permissions)
+		pg.GET("/device-types", middleware.RequireProjectPermission(deps.Authorizer, rbacperm.DeviceRead), deps.Device.ListDeviceTypes)
+		pg.POST("/device-types", middleware.RequireProjectPermission(deps.Authorizer, rbacperm.DeviceCreate), deps.Device.CreateCustomDeviceType)
+		pg.PATCH("/device-types/:deviceTypeID", middleware.RequireProjectPermission(deps.Authorizer, rbacperm.DeviceUpdate), deps.Device.UpdateCustomDeviceType)
+		pg.DELETE("/device-types/:deviceTypeID", middleware.RequireProjectPermission(deps.Authorizer, rbacperm.DeviceUpdate), deps.Device.DeleteCustomDeviceType)
+
+		pg.GET("/device-groups", middleware.RequireProjectPermission(deps.Authorizer, rbacperm.DeviceRead), deps.Device.ListDeviceGroups)
+		pg.POST("/device-groups", middleware.RequireProjectPermission(deps.Authorizer, rbacperm.DeviceUpdate), deps.Device.CreateDeviceGroup)
+		pg.PATCH("/device-groups/:groupID", middleware.RequireProjectPermission(deps.Authorizer, rbacperm.DeviceUpdate), deps.Device.UpdateDeviceGroup)
+		pg.DELETE("/device-groups/:groupID", middleware.RequireProjectPermission(deps.Authorizer, rbacperm.DeviceUpdate), deps.Device.DeleteDeviceGroup)
+		pg.POST("/device-groups/:groupID/members", middleware.RequireProjectPermission(deps.Authorizer, rbacperm.DeviceAssignGroup), deps.Device.AddDevicesToGroup)
+		pg.POST("/device-groups/:groupID/members/remove", middleware.RequireProjectPermission(deps.Authorizer, rbacperm.DeviceAssignGroup), deps.Device.RemoveDevicesFromGroup)
+
+		pg.GET("/devices", middleware.RequireProjectPermission(deps.Authorizer, rbacperm.DeviceRead), deps.Device.ListDevices)
+		// Bulk: service enforces action-specific permissions (assign_group / block / token_rotate).
+		pg.POST("/devices/bulk", middleware.RequireProjectPermission(deps.Authorizer, rbacperm.DeviceRead), deps.Device.BulkDevices)
+		pg.POST("/devices", middleware.RequireProjectPermission(deps.Authorizer, rbacperm.DeviceCreate), deps.Device.RegisterDevice)
+		pg.GET("/devices/:deviceID", middleware.RequireProjectPermission(deps.Authorizer, rbacperm.DeviceRead), deps.Device.GetDeviceTwin)
+		pg.POST("/devices/:deviceID/block", middleware.RequireProjectPermission(deps.Authorizer, rbacperm.DeviceBlock), deps.Device.BlockDevice)
+		pg.POST("/devices/:deviceID/unblock", middleware.RequireProjectPermission(deps.Authorizer, rbacperm.DeviceBlock), deps.Device.UnblockDevice)
+		pg.POST("/devices/:deviceID/rotate-token", middleware.RequireProjectPermission(deps.Authorizer, rbacperm.DeviceTokenRotate), deps.Device.RotateDeviceToken)
+	}
+
+	// Device-facing endpoints (device auth only).
+	deviceAPI := api.Group("/device")
+	deviceAPI.Use(deps.DeviceAuthMW)
+	{
+		deviceAPI.POST("/poll", deps.Device.DevicePoll)
+		deviceAPI.POST("/report", deps.Device.DeviceReport)
 	}
 }

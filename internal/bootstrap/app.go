@@ -14,6 +14,9 @@ import (
 	rbacmodel "firmflow/internal/domain/rbac/model"
 	rbacrepo "firmflow/internal/domain/rbac/repository"
 	rbacsvc "firmflow/internal/domain/rbac/service"
+	devicemodel "firmflow/internal/domain/device/model"
+	devicerepo "firmflow/internal/domain/device/repository"
+	devicesvc "firmflow/internal/domain/device/service"
 	"firmflow/internal/middleware"
 	"firmflow/internal/platform/logger"
 	"firmflow/internal/platform/mailer"
@@ -38,6 +41,8 @@ type Container struct {
 	AuthHandler    *handlers.AuthHandler
 	AuthService    *authsvc.Service
 	ProjectHandler *handlers.ProjectHandler
+	DeviceHandler  *handlers.DeviceHandler
+	DeviceService  *devicesvc.Service
 	Authorizer     *rbacsvc.Authorizer
 }
 
@@ -69,11 +74,18 @@ func New() (*App, error) {
 	rbacAuthorizer := rbacsvc.NewAuthorizer(rbacRepository)
 	projectService := rbacsvc.NewProjectService(rbacRepository, authRepository, rbacAuthorizer)
 	projectHandler := handlers.NewProjectHandler(projectService)
+
+	deviceRepository := devicerepo.New(db)
+	deviceService := devicesvc.New(rbacRepository, authRepository, rbacAuthorizer, deviceRepository)
+	deviceHandler := handlers.NewDeviceHandler(deviceService)
+
 	container := &Container{
 		HealthHandler:  healthHandler,
 		AuthHandler:    authHandler,
 		AuthService:    authService,
 		ProjectHandler: projectHandler,
+		DeviceHandler:  deviceHandler,
+		DeviceService:  deviceService,
 		Authorizer:     rbacAuthorizer,
 	}
 	routes.Register(engine, routes.Deps{
@@ -81,6 +93,8 @@ func New() (*App, error) {
 		Auth:       container.AuthHandler,
 		AuthMW:     middleware.RequireAuth(container.AuthService),
 		Project:    container.ProjectHandler,
+		Device:     container.DeviceHandler,
+		DeviceAuthMW: middleware.RequireDeviceAuth(deviceRepository),
 		Authorizer: container.Authorizer,
 	})
 
@@ -90,6 +104,7 @@ func New() (*App, error) {
 				authmodel.Migrator{},
 				rbacmodel.Migrator{},
 				projectmodel.Migrator{},
+				devicemodel.Migrator{},
 			},
 		}
 		if err := database.RunMigrations(context.Background(), db, migrator, log); err != nil {

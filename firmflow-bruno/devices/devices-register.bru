@@ -1,0 +1,24 @@
+meta {
+  name: devices-register
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{url}}/api/v1/projects/{{project_id}}/devices
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "Bench device 1",
+    "device_type_id": "{{device_type_id}}",
+    "hardware_identifier": "AA:BB:CC:DD:EE:01"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

@@ -152,13 +152,17 @@ func (r *Repository) GetProjectSummary(ctx context.Context, projectID uuid.UUID)
 		Count(&s.DevicesTotal).Error; err != nil {
 		return nil, err
 	}
+	// Must stay consistent with device online/offline logic.
+	// If you change this threshold, update `internal/domain/device/service` too.
+	threshold := time.Now().UTC().Add(-5 * time.Minute)
+
 	if err := db.Model(&projectmodel.Device{}).
-		Where("project_id = ? AND deleted_at IS NULL AND connection_status = ?", projectID, "online").
+		Where("project_id = ? AND deleted_at IS NULL AND last_seen_at IS NOT NULL AND last_seen_at >= ?", projectID, threshold).
 		Count(&s.DevicesOnline).Error; err != nil {
 		return nil, err
 	}
 	if err := db.Model(&projectmodel.Device{}).
-		Where("project_id = ? AND deleted_at IS NULL AND connection_status = ?", projectID, "offline").
+		Where("project_id = ? AND deleted_at IS NULL AND (last_seen_at IS NULL OR last_seen_at < ?)", projectID, threshold).
 		Count(&s.DevicesOffline).Error; err != nil {
 		return nil, err
 	}

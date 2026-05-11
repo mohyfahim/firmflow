@@ -104,8 +104,94 @@ Permissions: `member.read`, `member.invite`, `member.update_role`, `member.remov
 
 Permissions: `role.read`, `member.read` (assignable list), `role.create`, `role.update`, `role.delete`.
 
+**List response (`GET /roles`)**: `data` is an object with `roles` (each item: `id`, `name`, `type` = `system` \| `custom`, optional `slug` for system roles, `description`, `permissions` as `{ key, description }[]`, `assigned_user_count`) and `permission_catalog` (all registry keys with `key`, `description`, `group` for UI checklists). Custom role **create** returns a single role-shaped object in `data`; **update** returns the same. Raw role tokens are never returned here.
+
+---
+
+## Device types (`/api/v1/projects/:projectID/device-types`)
+
+| Method | Path | Body | Permission |
+|--------|------|------|--------------|
+| GET | `/device-types` | — | `device.read` |
+| POST | `/device-types` | `{ "name", "processor_architecture", "hardware_board_version", "flash_size_bytes", "memory_notes?" }` (custom type) | `device.create` |
+| PATCH | `/device-types/:deviceTypeID` | optional same fields | `device.update` (custom only) |
+| DELETE | `/device-types/:deviceTypeID` | — | `device.update` (custom only; blocked if devices still use the type) |
+
+Predefined catalog types are global; custom types are scoped to the project. Names are unique per project for custom types.
+
+---
+
+## Device groups (`/api/v1/projects/:projectID/device-groups`)
+
+| Method | Path | Body | Permission |
+|--------|------|------|--------------|
+| GET | `/device-groups` | — | `device.read` |
+| POST | `/device-groups` | `{ "name", "description?" }` | `device.update` |
+| PATCH | `/device-groups/:groupID` | optional `name`, `description` | `device.update` |
+| DELETE | `/device-groups/:groupID` | — | `device.update` (removes memberships, then deletes the group) |
+| POST | `/device-groups/:groupID/members` | `{ "device_ids": ["uuid", ...] }` | `device.assign_group` (idempotent add) |
+| POST | `/device-groups/:groupID/members/remove` | `{ "device_ids": ["uuid", ...] }` | `device.assign_group` (idempotent remove) |
+
+Group names are unique per project (normalized). Membership changes are audited on the project.
+
+---
+
+## Devices (dashboard) (`/api/v1/projects/:projectID/devices`)
+
+| Method | Path | Query / body | Permission |
+|--------|------|----------------|------------|
+| GET | `/devices` | Query: `online` (`true`\|`false`\|`1`\|`0`), `blocked`, `device_type_id`, `group_id`, `firmware_version` (exact), `last_seen_from`, `last_seen_to` (RFC3339), `q` (name / hardware search), pagination `page`, `page_size` (max 100), `sort` (`name`, `created_at`, `last_seen_at`, `current_firmware_version`, prefix `-` for descending; default `-created_at`) | `device.read` |
+| POST | `/devices/bulk` | See **Bulk devices** below | Route requires `device.read`; **service** enforces `device.assign_group`, `device.block`, or `device.token.rotate` per `action` |
+| POST | `/devices` | `{ "name", "device_type_id", "hardware_identifier" }` | `device.create` |
+| GET | `/devices/:deviceID` | — (device twin: type, blocked, online/offline from `last_seen_at` vs 5m threshold, firmware, `last_seen_at`, recent connection logs, token metadata **without** raw token) | `device.read` |
+| POST | `/devices/:deviceID/block` | — | `device.block` |
+| POST | `/devices/:deviceID/unblock` | — | `device.block` |
+| POST | `/devices/:deviceID/rotate-token` | — | `device.token.rotate` |
+
+**Registration / rotation**: successful `POST /devices` or `rotate-token` returns `data` including `auth_token` **once** (plaintext). Store it client-side; the server stores only a hash.
+
+**Hardware identifier**: unique per **project** (normalized). Duplicate returns `409` with code `hardware_id_in_use`.
+
+---
+
+## Bulk devices (`POST /api/v1/projects/:projectID/devices/bulk`)
+
+Body:
+
+```json
+{
+  "action": "add_to_group | remove_from_group | block | unblock | rotate_tokens",
+  "apply_to_filter": false,
+  "filter": {},
+  "device_ids": ["uuid"],
+  "group_id": "uuid"
+}
+```
+
+- If `apply_to_filter` is **true**, `device_ids` is ignored; targets are all devices matching `filter` (same fields as **GET /devices** list, expressed as JSON booleans / strings in `filter`: `online`, `blocked`, `device_type_id`, `group_id`, `firmware_version`, `last_seen_from`, `last_seen_to`, `q`).
+- If `apply_to_filter` is **false**, `device_ids` is required (non-empty).
+- `group_id` is required for `add_to_group` and `remove_from_group`.
+- Synchronous cap: **500** devices per request. If `apply_to_filter` matches more than 500, the API returns **`400`** with code `bulk_too_large`, `details.matched`, and `async_recommended: true` (reserved for future async jobs).
+
+Response `data` includes `action`, `processed`, `succeeded`, `failed[]` (`device_id`, `code`, `message`), optional `tokens_by_device_id` for `rotate_tokens`, `sync_cap`, `async_recommended`.
+
+---
+
+## Device client (OTA agent) (`/api/v1/device`)
+
+These routes use **device** authentication, not the user JWT.
+
+**Header**: `Authorization: Device <raw_device_token>`
+
+| Method | Path | Body |
+|--------|------|------|
+| POST | `/device/poll` | — |
+| POST | `/device/report` | `{ "current_firmware_version" }` |
+
+Blocked devices or revoked/disabled tokens receive `401` / `403` with stable error codes. Each call appends a **connection log** and updates `last_seen_at` (and firmware on report).
+
 ---
 
 ## Permission keys (reference)
 
-Registered keys include project/member/role management, `audit.read`, `dashboard.read`, and reserved keys for future device/firmware/campaign modules (`device.*`, `firmware.*`, `campaign.*`). See `internal/domain/rbac/permission/registry.go` for the canonical list.
+Registered keys cover project/member/role management, **devices** (`device.read`, `device.create`, `device.update`, `device.block`, `device.token.rotate`, `device.assign_group`), `audit.read`, `dashboard.read`, and reserved keys for firmware/campaign modules (`firmware.*`, `campaign.*`). See `internal/domain/rbac/permission/registry.go` for the canonical list.

@@ -1,0 +1,26 @@
+meta {
+  name: device-types-create
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{url}}/api/v1/projects/{{project_id}}/device-types
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "ACME MCU",
+    "processor_architecture": "arm_cortex_m4",
+    "hardware_board_version": "revB",
+    "flash_size_bytes": 2097152,
+    "memory_notes": "Lab custom board"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

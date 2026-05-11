@@ -1,0 +1,16 @@
+meta {
+  name: device-types-list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{url}}/api/v1/projects/{{project_id}}/device-types
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

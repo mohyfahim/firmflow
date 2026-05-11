@@ -1,0 +1,20 @@
+meta {
+  name: device-poll
+  type: http
+  seq: 12
+}
+
+post {
+  url: {{url}}/api/v1/device/poll
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Device {{device_token}}
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

@@ -12,7 +12,7 @@ Production-grade backend foundation for a SaaS OTA platform (microcontrollers), 
 
 ## Current Scope
 
-This scaffold includes:
+The repo includes:
 
 - environment-based config loading grouped by concerns:
   - `app`, `http`, `db`, `auth`, `mail`, `storage`, `rate_limit`
@@ -28,9 +28,13 @@ This scaffold includes:
 - Dockerfile for app image
 - Docker Compose for local app + PostgreSQL
 - Makefile targets
-- modular domain layout with implemented **authentication**, **current-user account** APIs (`/api/v1/auth`, `/api/v1/me`), and **projects + project RBAC** (`/api/v1/projects`, `/api/v1/projects/:projectID/...`)
+- modular domain layout with implemented:
+  - **Authentication** and **current-user** APIs (`/api/v1/auth`, `/api/v1/me`)
+  - **Projects** and **project-scoped RBAC** (`/api/v1/projects`, `/api/v1/projects/:projectID/...`)
+  - **Custom roles** (list with catalog, CRUD) and **members** under each project
+  - **Devices**: device types (catalog + custom), device groups, filtered device list, registration, twin, block/unblock, token rotation, **bulk** actions, and **device-facing** poll/report with `Authorization: Device <token>`
 
-Further surfaces (device registry, firmware artifacts, OTA campaigns, fleet dashboards) are represented by packages and permission keys but not yet wired as HTTP handlers.
+Firmware artifacts, OTA campaigns, and richer fleet analytics are still ahead; permission keys and stubs exist where noted in `docs/api.md`.
 
 ## Local Development
 
@@ -98,9 +102,9 @@ Further surfaces (device registry, firmware artifacts, OTA campaigns, fleet dash
 - `POST /api/v1/me/2fa/disable`
 - `DELETE /api/v1/me`
 
-### Projects & RBAC (implemented)
+### Projects, RBAC, and devices (implemented)
 
-Multi-tenant workspaces are modeled as **projects**. Authenticated users create projects, invite members, assign roles, and manage custom roles with permission keys from the central registry (`project.read`, `member.invite`, `device.read`, etc.). Routes under `/api/v1/projects/:projectID` enforce **project-scoped RBAC** via middleware that checks membership and permission keys before the handler runs.
+Multi-tenant workspaces are **projects**. Under `/api/v1/projects/:projectID`, middleware checks membership and a **permission key** per route (e.g. `project.read`, `member.invite`, `device.read`, `device.assign_group`). Devices live in a project; **device auth** for field agents uses a separate header on `/api/v1/device/*` (see [docs/api.md](docs/api.md)).
 
 ### Authentication for API clients
 
@@ -118,8 +122,14 @@ See [docs/api.md](docs/api.md) for method/path summaries, request bodies, and co
 
 ### Bruno collection
 
-The [Bruno](https://www.usebruno.com/) API collection lives in `firmflow-bruno/`. Import the folder as a collection, select the `develop` environment, run **Login**, then paste `data.access_token` (and optionally `data.refresh_token`, project UUIDs) into the environment variables so **me** and **projects** requests authenticate.
+The [Bruno](https://www.usebruno.com/) API collection lives in `firmflow-bruno/`. Import the folder as a collection, select the **`develop`** environment, run **Login**, then set:
 
-### Roadmap (skeleton domains)
+- `access_token` (from `data.access_token`)
+- `project_id` (from create/list project responses)
+- For device flows: `device_type_id`, `device_id`, `group_id`, and after **Register device** or **Rotate token**, `device_token` for **Device poll** / **Device report** (`Authorization: Device …` is set in those requests).
 
-Device inventory, firmware artifacts, OTA campaigns, and fleet dashboards are modeled in package layout and permission keys but not yet exposed as HTTP APIs. They will plug into the same config, middleware, and RBAC patterns as auth and projects.
+Folders mirror major areas: `auth`, `me`, `health`, `projects`, `devices`.
+
+### Roadmap
+
+Firmware storage, OTA campaigns, and deeper analytics/dashboards are next; they will follow the same layering and RBAC patterns.

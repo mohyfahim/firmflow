@@ -1,0 +1,16 @@
+meta {
+  name: devices-block
+  type: http
+  seq: 19
+}
+
+post {
+  url: {{url}}/api/v1/projects/{{project_id}}/devices/{{device_id}}/block
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
