@@ -1,0 +1,16 @@
+meta {
+  name: campaigns-pause
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{url}}/api/v1/projects/{{project_id}}/campaigns/{{campaign_id}}/pause
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

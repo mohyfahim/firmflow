@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -17,6 +18,7 @@ type Config struct {
 	Mail      MailConfig
 	Storage   StorageConfig
 	RateLimit RateLimitConfig
+	DeviceOTA DeviceOTAConfig
 }
 
 type AppConfig struct {
@@ -76,6 +78,16 @@ type RateLimitConfig struct {
 	RequestsPerMinute int
 }
 
+// DeviceOTAConfig controls the binary TCP OTA listener and short-lived download tokens.
+type DeviceOTAConfig struct {
+	// TCPListenAddr is a host:port (e.g. ":9001") for the device OTA protocol. Empty disables TCP.
+	TCPListenAddr string
+	// DownloadTokenTTL is the validity window for OTA download tokens returned on poll.
+	DownloadTokenTTL time.Duration
+	// PublicDownloadBaseURL is optional (e.g. https://api.example.com) used to build absolute download URLs for devices.
+	PublicDownloadBaseURL string
+}
+
 func Load() (*Config, error) {
 	_ = godotenv.Load()
 
@@ -129,6 +141,11 @@ func Load() (*Config, error) {
 		RateLimit: RateLimitConfig{
 			Enabled:           getEnvBool("RATE_LIMIT_ENABLED", true),
 			RequestsPerMinute: getEnvInt("RATE_LIMIT_REQUESTS_PER_MINUTE", 120),
+		},
+		DeviceOTA: DeviceOTAConfig{
+			TCPListenAddr:         getEnv("DEVICE_OTA_TCP_ADDR", ""),
+			DownloadTokenTTL:      getEnvDuration("OTA_DOWNLOAD_TOKEN_TTL", 20*time.Minute),
+			PublicDownloadBaseURL: strings.TrimRight(strings.TrimSpace(getEnv("PUBLIC_HTTP_BASE_URL", "")), "/"),
 		},
 	}
 

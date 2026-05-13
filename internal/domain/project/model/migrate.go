@@ -11,7 +11,6 @@ type Migrator struct{}
 func (Migrator) Migrate(_ context.Context, db *gorm.DB) error {
 	return db.AutoMigrate(
 		&Device{},
-		&Campaign{},
 		&DeviceUpdateReport{},
 	)
 }

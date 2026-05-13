@@ -2,6 +2,8 @@
 
 Base path (local default): `http://localhost:8080`
 
+New contributors: see **[Developer onboarding](onboarding.md)** for how routes and domains map to code.
+
 All successful JSON responses use the envelope `{ "data": ... , "meta": ... }` where `meta` appears only when pagination or extra metadata is returned. Errors use `{ "error": { "code", "message", "details?", "request_id" } }`.
 
 Send `X-Request-ID` from clients if you want distributed tracing; the server may generate one when absent.
@@ -188,7 +190,49 @@ These routes use **device** authentication, not the user JWT.
 | POST | `/device/poll` | — |
 | POST | `/device/report` | `{ "current_firmware_version" }` |
 
+When campaigns are enabled: **poll** may include `data.ota` (`campaign_id`, `firmware_id`, `version`, `checksum_sha256`) if an **active** campaign has a **pending** or **offered** assignment for the device. On first poll with a **pending** assignment, the server moves it to **offered**; further polls while still **offered** return the same OTA payload so the device can recover metadata (e.g. after losing local state). Paused or cancelled campaigns never offer. The JSON poll path does **not** embed a download secret in the response; use the **binary TCP OTA** flow or the **short-lived download token** endpoint below when issuing tokens from the TCP handler.
+
+**Report**: if an **offered** or **downloaded** assignment exists for an **active** campaign and `current_firmware_version` matches the campaign firmware **version string** (case-insensitive trim), the assignment is marked **installed**; the campaign **completes** when all assignments are terminal (`installed` or `failed`).
+
 Blocked devices or revoked/disabled tokens receive `401` / `403` with stable error codes. Each call appends a **connection log** and updates `last_seen_at` (and firmware on report).
+
+---
+
+## Firmware download (short-lived OTA token)
+
+**No authentication.** Intended only for devices that already received a **time-limited, opaque token** from an authenticated poll flow (typically the binary TCP OTA server). The long-lived **device session token** must never appear in URLs.
+
+| Method | Path | Query |
+|--------|------|--------|
+| GET | `/api/v1/device/firmware-download` | `token` (required): 64-character hex secret |
+
+Success: streams `application/octet-stream` with `Content-Disposition`, `Content-Length`, and `X-Checksum-Sha256` (same shape as the authenticated project firmware download).
+
+Failure: **`401`** with error code `invalid_ota_token` for unknown, expired, consumed, or blocked-device tokens (message is intentionally generic).
+
+The token is **one-time**: the first successful open of the object stream marks the token consumed; retries must obtain a new token from **poll**.
+
+---
+
+## Device OTA (binary TCP)
+
+When `DEVICE_OTA_TCP_ADDR` is set (e.g. `:9001`), the API process also listens on **raw TCP** for a compact proprietary protocol used by constrained MCUs (implementation: `internal/transport/devotcp`).
+
+**Environment (see `.env.example`)**
+
+| Variable | Purpose |
+|----------|---------|
+| `DEVICE_OTA_TCP_ADDR` | Listen address for TCP OTA; empty disables the listener. |
+| `OTA_DOWNLOAD_TOKEN_TTL` | Lifetime for download tokens issued on poll (Go duration, e.g. `20m`). |
+| `PUBLIC_HTTP_BASE_URL` | Optional origin (no trailing slash), e.g. `https://api.example.com`, prepended to `/api/v1/device/firmware-download?token=…` in poll responses so devices receive an absolute URL. If unset, the poll payload contains a **relative** path only. |
+
+**Session**: connect → **auth frame** (raw `Device` token in payload) → server **auth OK** or **error frame** → one or more **poll** / **report** frames on the same connection.
+
+**Frames**: 16-byte header (magic `FRM1`, version `1`, message type, request id, payload length) + payload. Message types and payload layout are defined in `internal/transport/devotcp/protocol.go`.
+
+**Poll** (after auth): updates `last_seen_at`, logs `ota_poll`, resolves campaign offer (pending→offered as for HTTP), and when an update exists returns `update_available`, target version, raw 32-byte SHA-256 checksum, campaign and firmware UUIDs, download URL/path, and token expiry (Unix seconds). **Report** carries `campaign_id` and status (`downloaded` / `installed` / `failed`) plus optional error fields; server updates assignment state idempotently and logs `ota_report`.
+
+Shutdown closes the TCP listener via `App.StopOTA()` (see `cmd/server/main.go`).
 
 ---
 
@@ -218,6 +262,49 @@ Project-scoped firmware binaries with metadata. Binaries are stored via an inter
 
 ---
 
+## OTA campaigns (`/api/v1/projects/:projectID/campaigns`)
+
+Rollouts tie a **firmware** to a **target scope** (device groups and/or explicit device IDs). Only devices whose **device type** is compatible with the firmware are included. Archived projects reject creation.
+
+| Method | Path | Body | Permission |
+|--------|------|------|------------|
+| GET | `/campaigns` | `page`, `page_size`, `sort` (default `-created_at` via list impl) | `campaign.read` |
+| POST | `/campaigns` | JSON below | `campaign.create` |
+| GET | `/campaigns/:campaignID` | — (detail + **progress** counts) | `campaign.read` |
+| POST | `/campaigns/:campaignID/pause` | — | `campaign.pause` |
+| POST | `/campaigns/:campaignID/resume` | — | `campaign.update` |
+| POST | `/campaigns/:campaignID/cancel` | — | `campaign.cancel` |
+
+**Create body**
+
+```json
+{
+  "name": "Pilot rollout",
+  "firmware_id": "uuid",
+  "rollout_kind": "immediate | time_scheduled | percentage",
+  "rollout_percent": 20,
+  "scheduled_start_at": "2026-01-15T12:00:00Z",
+  "device_group_ids": ["uuid"],
+  "explicit_device_ids": ["uuid"]
+}
+```
+
+- **`rollout_kind`**
+  - **`immediate`**: activate as soon as created (unless `scheduled_start_at` is in the future — then status is **scheduled** until due).
+  - **`time_scheduled`**: requires **`scheduled_start_at`** (UTC). Status **scheduled** until that time, then **active** (background tick; idempotent `UPDATE … WHERE status='scheduled' AND scheduled_start_at <= now()`).
+  - **`percentage`**: requires **`rollout_percent`** (1–100). After resolving **compatible** devices, the server sorts device UUIDs **ascending** and takes the first **ceil(n × percent / 100)** devices — **deterministic and stable** for the same scope and percent (not random per request).
+- **Targets**: union of devices in `device_group_ids` and `explicit_device_ids` (deduped), then compatibility-filtered. Empty compatible set → **`400`**.
+
+**States**: `draft` (reserved), `scheduled`, `active`, `paused`, `cancelled`, `completed`. Valid transitions are enforced in code (`internal/domain/campaign/model/state.go`). **Pause** stops new OTA offers (poll skips non-active). **Cancel** ends the campaign. **Completed** when every assignment is `installed` or `failed`.
+
+**Progress** (`GET …/:campaignID`): `target_count`, per-status counts (`pending`, `offered`, `downloaded`, `installed`, `failed`), `completion_percent` = \((installed+failed)/target×100\), `success_percent` = \(installed/target×100\).
+
+**Project delete**: soft-delete is blocked while any campaign is **not** `completed` or `cancelled` (includes `draft`, `scheduled`, `active`, `paused`).
+
+**Audit**: `campaign_created`, `campaign_paused`, `campaign_resumed`, `campaign_cancelled`.
+
+---
+
 ## Permission keys (reference)
 
-Registered keys cover project/member/role management, **devices** (`device.read`, `device.create`, `device.update`, `device.block`, `device.token.rotate`, `device.assign_group`), **firmware** (`firmware.read`, `firmware.upload`), `audit.read`, `dashboard.read`, and reserved keys for campaign modules (`campaign.*`). See `internal/domain/rbac/permission/registry.go` for the canonical list.
+Registered keys cover project/member/role management, **devices**, **firmware**, **campaigns** (`campaign.read`, `campaign.create`, `campaign.update`, `campaign.pause`, `campaign.cancel`), `audit.read`, `dashboard.read`. See `internal/domain/rbac/permission/registry.go` for the canonical list.

@@ -5,6 +5,7 @@ import (
 	"firmflow/internal/common/pagination"
 	"firmflow/internal/common/response"
 	"firmflow/internal/common/validator"
+	campaignsvc "firmflow/internal/domain/campaign/service"
 	devicesvc "firmflow/internal/domain/device/service"
 	"firmflow/internal/transport/http/dto"
 
@@ -13,11 +14,12 @@ import (
 )
 
 type DeviceHandler struct {
-	svc *devicesvc.Service
+	svc       *devicesvc.Service
+	campaigns *campaignsvc.Service
 }
 
-func NewDeviceHandler(svc *devicesvc.Service) *DeviceHandler {
-	return &DeviceHandler{svc: svc}
+func NewDeviceHandler(svc *devicesvc.Service, campaigns *campaignsvc.Service) *DeviceHandler {
+	return &DeviceHandler{svc: svc, campaigns: campaigns}
 }
 
 func (h *DeviceHandler) ListDeviceTypes(c *gin.Context) {
@@ -397,7 +399,7 @@ func (h *DeviceHandler) RegisterDevice(c *gin.Context) {
 		return
 	}
 	response.Created(c, gin.H{
-		"device":      twin,
+		"device":     twin,
 		"auth_token": rawToken,
 	})
 }
@@ -494,7 +496,7 @@ func (h *DeviceHandler) RotateDeviceToken(c *gin.Context) {
 		return
 	}
 	response.OK(c, gin.H{
-		"device":      twin,
+		"device":     twin,
 		"auth_token": rawToken,
 	})
 }
@@ -518,7 +520,18 @@ func (h *DeviceHandler) DevicePoll(c *gin.Context) {
 		c.Error(err)
 		return
 	}
-	response.OK(c, gin.H{"message": "poll received"})
+	payload := gin.H{"message": "poll received"}
+	if h.campaigns != nil {
+		offer, err := h.campaigns.BuildPollOffer(c.Request.Context(), projectID, deviceID)
+		if err != nil {
+			c.Error(err)
+			return
+		}
+		if offer != nil {
+			payload["ota"] = offer
+		}
+	}
+	response.OK(c, payload)
 }
 
 func (h *DeviceHandler) DeviceReport(c *gin.Context) {
@@ -544,6 +557,8 @@ func (h *DeviceHandler) DeviceReport(c *gin.Context) {
 		c.Error(err)
 		return
 	}
+	if h.campaigns != nil {
+		_ = h.campaigns.OnDeviceReportFirmware(c.Request.Context(), projectID, deviceID, req.CurrentFirmwareVersion)
+	}
 	response.OK(c, gin.H{"message": "report received"})
 }
-

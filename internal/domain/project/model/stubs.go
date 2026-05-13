@@ -55,23 +55,6 @@ func normalizeHardwareIdentifier(raw string) string {
 	return raw
 }
 
-// Campaign is a minimal row used to block project deletion when non-terminal campaigns exist.
-type Campaign struct {
-	ID        uuid.UUID      `gorm:"type:uuid;primaryKey"`
-	ProjectID uuid.UUID      `gorm:"type:uuid;index;not null"`
-	Status    string         `gorm:"size:32;not null;index"` // draft | scheduled | active | paused | completed | cancelled
-	CreatedAt time.Time      `gorm:"not null"`
-	UpdatedAt time.Time      `gorm:"not null"`
-	DeletedAt gorm.DeletedAt `gorm:"index"`
-}
-
-func (c *Campaign) BeforeCreate(_ *gorm.DB) error {
-	if c.ID == uuid.Nil {
-		c.ID = uuid.New()
-	}
-	return nil
-}
-
 // DeviceUpdateReport stores coarse-grained OTA outcomes for dashboard summaries.
 type DeviceUpdateReport struct {
 	ID        uuid.UUID `gorm:"type:uuid;primaryKey"`

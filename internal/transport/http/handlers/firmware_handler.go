@@ -168,6 +168,32 @@ func (h *FirmwareHandler) DownloadFirmware(c *gin.Context) {
 	}
 }
 
+// DeviceFirmwareDownloadByToken streams firmware bytes using a short-lived OTA download token (no user JWT).
+func (h *FirmwareHandler) DeviceFirmwareDownloadByToken(c *gin.Context) {
+	token := strings.TrimSpace(c.Query("token"))
+	if token == "" {
+		c.Error(apperrors.BadRequest("token is required", nil))
+		return
+	}
+	rc, fw, err := h.svc.OpenFirmwareWithOtaDownloadToken(c.Request.Context(), token)
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	defer rc.Close()
+
+	filename := safeDownloadFilename(fw.OriginalFilename)
+	c.Header("Content-Type", "application/octet-stream")
+	c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
+	c.Header("X-Checksum-Sha256", fw.ChecksumSHA256)
+	c.Header("Content-Length", strconv.FormatInt(fw.FileSizeBytes, 10))
+
+	c.Status(http.StatusOK)
+	if _, err := io.Copy(c.Writer, rc); err != nil {
+		return
+	}
+}
+
 func (h *FirmwareHandler) DeleteFirmware(c *gin.Context) {
 	projectID, err := uuid.Parse(c.Param("projectID"))
 	if err != nil {

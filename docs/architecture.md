@@ -1,6 +1,6 @@
 # Firmflow Backend Architecture
 
-See also: [HTTP API reference](api.md).
+See also: [HTTP API reference](api.md) and [Developer onboarding](onboarding.md).
 
 ## Architectural Style
 
@@ -12,14 +12,15 @@ See also: [HTTP API reference](api.md).
 ## Package Layout
 
 - `cmd/server`: executable entrypoint and graceful shutdown.
-- `internal/config`: environment-backed application configuration grouped by app/http/db/auth/mail/storage/rate_limit.
+- `internal/config`: environment-backed application configuration grouped by app/http/db/auth/mail/storage/rate_limit/**device_ota** (TCP OTA listen address, download token TTL, public base URL for absolute download links).
 - `internal/bootstrap`: object graph wiring and application bootstrapping.
 - `internal/common`: shared primitives (errors, response envelopes, pagination, validation, UTC helpers).
 - `internal/middleware`: request ID, structured logging, recovery, CORS, and centralized API error handling.
 - `internal/database`: database bootstrap, naming strategy, pooling, and migration integration hook.
 - `internal/platform`: infrastructure adapters (logger, mailer, storage, security, jobs, observability).
 - `internal/transport/http`: HTTP routes, handlers, and DTOs.
-- `internal/domain`: module boundaries for auth, users, projects, roles, devices, firmware, campaigns, audit, dashboard.
+- `internal/transport/devotcp`: optional **binary TCP** OTA listener (device token auth, poll/report, short-lived download token issuance); see `docs/api.md` and `protocol.go`.
+- `internal/domain`: module boundaries for auth, users, projects, roles, devices (including **OTA download token** persistence under `device/model`), firmware, campaigns, audit, dashboard.
 - `migrations`: SQL migrations (reserved).
 - `test`: integration and E2E tests (reserved).
 
@@ -33,7 +34,7 @@ See also: [HTTP API reference](api.md).
 - Every request carries `X-Request-ID` for tracing and debugging.
 - Request-scoped logger is attached by middleware for consistent structured logs.
 - Repository pattern for GORM query encapsulation.
-- Mandatory authz checks for mutating handlers (enforced per module in future tasks).
+- Mandatory authz checks for mutating handlers (project routes use `RequireProjectPermission` with keys from the permission registry).
 - Security-by-default: no sensitive secrets/tokens in logs.
 
 ## Authentication Domain

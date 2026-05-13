@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	campaignmodel "firmflow/internal/domain/campaign/model"
 	projectmodel "firmflow/internal/domain/project/model"
 	rbacmodel "firmflow/internal/domain/rbac/model"
 
@@ -117,7 +118,7 @@ func (r *Repository) DeleteProjectSoft(ctx context.Context, projectID uuid.UUID)
 			return err
 		}
 		if n > 0 {
-			return errors.New("active_or_scheduled_campaigns")
+			return errors.New("blocking_campaigns")
 		}
 		if err := r.RevokeDevicesAndDisablePolling(ctx, tx, projectID); err != nil {
 			return err
@@ -128,8 +129,11 @@ func (r *Repository) DeleteProjectSoft(ctx context.Context, projectID uuid.UUID)
 
 func (r *Repository) countBlockingCampaignsTx(tx *gorm.DB, projectID uuid.UUID) (int64, error) {
 	var n int64
-	err := tx.Model(&projectmodel.Campaign{}).
-		Where("project_id = ? AND deleted_at IS NULL AND status IN ?", projectID, []string{"active", "scheduled"}).
+	err := tx.Model(&campaignmodel.Campaign{}).
+		Where("project_id = ? AND deleted_at IS NULL AND status NOT IN ?", projectID, []string{
+			campaignmodel.StatusCompleted,
+			campaignmodel.StatusCancelled,
+		}).
 		Count(&n).Error
 	return n, err
 }

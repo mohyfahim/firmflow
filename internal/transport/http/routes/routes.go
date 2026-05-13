@@ -16,6 +16,7 @@ type Deps struct {
 	Project      *handlers.ProjectHandler
 	Device       *handlers.DeviceHandler
 	Firmware     *handlers.FirmwareHandler
+	Campaign     *handlers.CampaignHandler
 	DeviceAuthMW gin.HandlerFunc
 	Authorizer   *rbacsvc.Authorizer
 }
@@ -28,6 +29,8 @@ func Register(router *gin.Engine, deps Deps) {
 	}
 
 	api := router.Group("/api/v1")
+	api.GET("/device/firmware-download", deps.Firmware.DeviceFirmwareDownloadByToken)
+
 	auth := api.Group("/auth")
 	{
 		auth.POST("/register", deps.Auth.Register)
@@ -107,6 +110,13 @@ func Register(router *gin.Engine, deps Deps) {
 		pg.GET("/firmwares/:firmwareID", middleware.RequireProjectPermission(deps.Authorizer, rbacperm.FirmwareRead), deps.Firmware.GetFirmware)
 		pg.GET("/firmwares/:firmwareID/download", middleware.RequireProjectPermission(deps.Authorizer, rbacperm.FirmwareRead), deps.Firmware.DownloadFirmware)
 		pg.DELETE("/firmwares/:firmwareID", middleware.RequireProjectPermission(deps.Authorizer, rbacperm.FirmwareUpload), deps.Firmware.DeleteFirmware)
+
+		pg.GET("/campaigns", middleware.RequireProjectPermission(deps.Authorizer, rbacperm.CampaignRead), deps.Campaign.ListCampaigns)
+		pg.POST("/campaigns", middleware.RequireProjectPermission(deps.Authorizer, rbacperm.CampaignCreate), deps.Campaign.CreateCampaign)
+		pg.GET("/campaigns/:campaignID", middleware.RequireProjectPermission(deps.Authorizer, rbacperm.CampaignRead), deps.Campaign.GetCampaign)
+		pg.POST("/campaigns/:campaignID/pause", middleware.RequireProjectPermission(deps.Authorizer, rbacperm.CampaignPause), deps.Campaign.PauseCampaign)
+		pg.POST("/campaigns/:campaignID/resume", middleware.RequireProjectPermission(deps.Authorizer, rbacperm.CampaignUpdate), deps.Campaign.ResumeCampaign)
+		pg.POST("/campaigns/:campaignID/cancel", middleware.RequireProjectPermission(deps.Authorizer, rbacperm.CampaignCancel), deps.Campaign.CancelCampaign)
 	}
 
 	// Device-facing endpoints (device auth only).

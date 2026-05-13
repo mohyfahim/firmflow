@@ -1,0 +1,16 @@
+meta {
+  name: campaigns-resume
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{url}}/api/v1/projects/{{project_id}}/campaigns/{{campaign_id}}/resume
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

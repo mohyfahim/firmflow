@@ -11,12 +11,12 @@ import (
 	authmodel "firmflow/internal/domain/auth/model"
 	authrepo "firmflow/internal/domain/auth/repository"
 	security "firmflow/internal/domain/auth/security"
-	rbacperm "firmflow/internal/domain/rbac/permission"
-	rbacsvc "firmflow/internal/domain/rbac/service"
-	rbacrepo "firmflow/internal/domain/rbac/repository"
-	projectmodel "firmflow/internal/domain/project/model"
 	deviceModel "firmflow/internal/domain/device/model"
 	devicerepo "firmflow/internal/domain/device/repository"
+	projectmodel "firmflow/internal/domain/project/model"
+	rbacperm "firmflow/internal/domain/rbac/permission"
+	rbacrepo "firmflow/internal/domain/rbac/repository"
+	rbacsvc "firmflow/internal/domain/rbac/service"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -25,9 +25,9 @@ import (
 const onlineThreshold = 5 * time.Minute
 
 type Service struct {
-	rbacRepo  *rbacrepo.Repository
-	rbacAuth  *rbacsvc.Authorizer
-	authRepo  *authrepo.Repository
+	rbacRepo   *rbacrepo.Repository
+	rbacAuth   *rbacsvc.Authorizer
+	authRepo   *authrepo.Repository
 	deviceRepo *devicerepo.Repository
 }
 
@@ -80,9 +80,9 @@ func normalizeHardwareIdentifier(raw string) string {
 // ===== Device type APIs =====
 
 type DeviceTypeView struct {
-	ID uuid.UUID `json:"id"`
-	Name string `json:"name"`
-	Type string `json:"type"` // system/custom
+	ID   uuid.UUID `json:"id"`
+	Name string    `json:"name"`
+	Type string    `json:"type"` // system/custom
 
 	ProcessorArchitecture string `json:"processor_architecture"`
 	HardwareBoardVersion  string `json:"hardware_board_version"`
@@ -120,9 +120,9 @@ func mapDeviceTypeView(dt *deviceModel.DeviceType) DeviceTypeView {
 		t = "system"
 	}
 	return DeviceTypeView{
-		ID:                   dt.ID,
-		Name:                 dt.Name,
-		Type:                 t,
+		ID:                    dt.ID,
+		Name:                  dt.Name,
+		Type:                  t,
 		ProcessorArchitecture: dt.ProcessorArchitecture,
 		HardwareBoardVersion:  dt.HardwareBoardVersion,
 		FlashSizeBytes:        dt.FlashSizeBytes,
@@ -159,7 +159,7 @@ func (s *Service) CreateCustomDeviceType(ctx context.Context, actorUserID, proje
 	}
 	_ = s.audit(ctx, actorUserID, "device_type.created", projectID.String(), map[string]interface{}{
 		"device_type_id": dt.ID.String(),
-		"name":            name,
+		"name":           name,
 	})
 	v := mapDeviceTypeView(dt)
 	return &v, nil
@@ -230,31 +230,31 @@ func (s *Service) DeleteCustomDeviceType(ctx context.Context, actorUserID, proje
 // ===== Device APIs =====
 
 type ConnectionLogView struct {
-	ID uuid.UUID `json:"id"`
-	DeviceID uuid.UUID `json:"device_id"`
-	IP string `json:"ip"`
-	UserAgent string `json:"user_agent,omitempty"`
-	Action string `json:"action"`
-	Endpoint string `json:"endpoint"`
-	At time.Time `json:"timestamp"`
+	ID        uuid.UUID `json:"id"`
+	DeviceID  uuid.UUID `json:"device_id"`
+	IP        string    `json:"ip"`
+	UserAgent string    `json:"user_agent,omitempty"`
+	Action    string    `json:"action"`
+	Endpoint  string    `json:"endpoint"`
+	At        time.Time `json:"timestamp"`
 }
 
 type DeviceTwinView struct {
-	ID uuid.UUID `json:"id"`
-	Name string `json:"name"`
-	HardwareIdentifier string `json:"hardware_identifier"`
+	ID                 uuid.UUID `json:"id"`
+	Name               string    `json:"name"`
+	HardwareIdentifier string    `json:"hardware_identifier"`
 
 	DeviceType DeviceTypeView `json:"device_type"`
-	Blocked bool `json:"blocked_state"`
+	Blocked    bool           `json:"blocked_state"`
 
-	Online bool `json:"online"`
-	CurrentFirmwareVersion string `json:"current_firmware_version"`
-	LastSeenAt *time.Time `json:"last_seen_at"`
+	Online                 bool       `json:"online"`
+	CurrentFirmwareVersion string     `json:"current_firmware_version"`
+	LastSeenAt             *time.Time `json:"last_seen_at"`
 
 	RecentConnectionLogs []ConnectionLogView `json:"recent_connection_logs"`
 
 	AuthTokenMetadata *struct {
-		ID uuid.UUID `json:"id"`
+		ID       uuid.UUID  `json:"id"`
 		IssuedAt *time.Time `json:"issued_at,omitempty"`
 	} `json:"token_metadata,omitempty"`
 }
@@ -303,7 +303,7 @@ func (s *Service) RegisterDevice(ctx context.Context, actorUserID, projectID, de
 
 	_ = s.audit(ctx, actorUserID, "device.created", projectID.String(), map[string]interface{}{
 		"device_id":        device.ID.String(),
-		"device_type_id":  deviceTypeID.String(),
+		"device_type_id":   deviceTypeID.String(),
 		"hardware_id_norm": hwNorm,
 	})
 
@@ -340,7 +340,7 @@ func (s *Service) RotateDeviceToken(ctx context.Context, actorUserID, projectID,
 	}
 
 	_ = s.audit(ctx, actorUserID, "device.token_rotated", projectID.String(), map[string]interface{}{
-		"device_id":   deviceID.String(),
+		"device_id":    deviceID.String(),
 		"token_issued": now,
 	})
 
@@ -404,12 +404,12 @@ func (s *Service) GetDeviceTwin(ctx context.Context, actorUserID, projectID, dev
 		ID:                     d.ID,
 		Name:                   d.Name,
 		HardwareIdentifier:     d.HardwareIdentifier,
-		DeviceType:            mapDeviceTypeView(dt),
-		Blocked:               d.Blocked,
-		Online:                online,
+		DeviceType:             mapDeviceTypeView(dt),
+		Blocked:                d.Blocked,
+		Online:                 online,
 		CurrentFirmwareVersion: d.CurrentFirmwareVersion,
-		LastSeenAt:            d.LastSeenAt,
-		RecentConnectionLogs:  make([]ConnectionLogView, 0, len(logs)),
+		LastSeenAt:             d.LastSeenAt,
+		RecentConnectionLogs:   make([]ConnectionLogView, 0, len(logs)),
 	}
 	for i := range logs {
 		l := logs[i]
@@ -438,35 +438,29 @@ func (s *Service) GetDeviceTwin(ctx context.Context, actorUserID, projectID, dev
 
 // DevicePoll records a poll connection and updates last_seen_at for online/offline.
 func (s *Service) DevicePoll(ctx context.Context, projectID, deviceID uuid.UUID, ip, userAgent, endpoint string) error {
-	d, err := s.deviceRepo.GetDevice(ctx, projectID, deviceID)
-	if err != nil {
-		return err
-	}
-	if d.Blocked {
-		return apperrors.New("device_blocked", "device is blocked", 403, nil)
-	}
-	now := time.Now().UTC()
-	online := isOnline(&now, now) // always true for just-updated last_seen_at
-	connStatus := "offline"
-	if online {
-		connStatus = "online"
-	}
-	if err := s.deviceRepo.UpdateDeviceSeenAndFirmware(ctx, projectID, deviceID, nil, now, connStatus); err != nil {
-		return err
-	}
-	return s.deviceRepo.CreateDeviceConnectionLog(ctx, &deviceModel.DeviceConnectionLog{
-		ProjectID: projectID,
-		DeviceID:  deviceID,
-		IP:         ip,
-		UserAgent:  userAgent,
-		Action:     "poll",
-		Endpoint:   endpoint,
-		CreatedAt:  now,
-	})
+	return s.recordDeviceConnection(ctx, projectID, deviceID, ip, userAgent, endpoint, "poll", nil)
 }
 
 // DeviceReport records a report connection and updates firmware version + last_seen_at.
 func (s *Service) DeviceReport(ctx context.Context, projectID, deviceID uuid.UUID, firmwareVersion string, ip, userAgent, endpoint string) error {
+	fw := strings.TrimSpace(firmwareVersion)
+	if fw == "" {
+		return apperrors.BadRequest("current_firmware_version is required", nil)
+	}
+	return s.recordDeviceConnection(ctx, projectID, deviceID, ip, userAgent, endpoint, "report", &fw)
+}
+
+// DeviceOtaPoll records a TCP/binary OTA poll (last_seen + connection log).
+func (s *Service) DeviceOtaPoll(ctx context.Context, projectID, deviceID uuid.UUID, remoteIP, endpoint string) error {
+	return s.recordDeviceConnection(ctx, projectID, deviceID, remoteIP, "", endpoint, "ota_poll", nil)
+}
+
+// DeviceOtaReportTouch records a TCP/binary OTA report connection and optionally updates reported firmware.
+func (s *Service) DeviceOtaReportTouch(ctx context.Context, projectID, deviceID uuid.UUID, remoteIP, endpoint string, firmwareVersion *string) error {
+	return s.recordDeviceConnection(ctx, projectID, deviceID, remoteIP, "", endpoint, "ota_report", firmwareVersion)
+}
+
+func (s *Service) recordDeviceConnection(ctx context.Context, projectID, deviceID uuid.UUID, ip, userAgent, endpoint, action string, firmwareVersion *string) error {
 	d, err := s.deviceRepo.GetDevice(ctx, projectID, deviceID)
 	if err != nil {
 		return err
@@ -480,24 +474,19 @@ func (s *Service) DeviceReport(ctx context.Context, projectID, deviceID uuid.UUI
 	if online {
 		connStatus = "online"
 	}
-	fw := strings.TrimSpace(firmwareVersion)
-	if fw == "" {
-		return apperrors.BadRequest("current_firmware_version is required", nil)
-	}
-	if err := s.deviceRepo.UpdateDeviceSeenAndFirmware(ctx, projectID, deviceID, &fw, now, connStatus); err != nil {
+	if err := s.deviceRepo.UpdateDeviceSeenAndFirmware(ctx, projectID, deviceID, firmwareVersion, now, connStatus); err != nil {
 		return err
 	}
 	return s.deviceRepo.CreateDeviceConnectionLog(ctx, &deviceModel.DeviceConnectionLog{
 		ProjectID: projectID,
 		DeviceID:  deviceID,
-		IP:         ip,
-		UserAgent:  userAgent,
-		Action:     "report",
-		Endpoint:   endpoint,
-		CreatedAt:  now,
+		IP:        ip,
+		UserAgent: userAgent,
+		Action:    action,
+		Endpoint:  endpoint,
+		CreatedAt: now,
 	})
 }
 
 // ensure usage of imported packages
 var _ = projectmodel.Device{}
-

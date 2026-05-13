@@ -5,12 +5,17 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
+	"time"
 
 	"firmflow/internal/config"
 	"firmflow/internal/database"
 	authmodel "firmflow/internal/domain/auth/model"
 	authrepo "firmflow/internal/domain/auth/repository"
 	authsvc "firmflow/internal/domain/auth/service"
+	campaignmodel "firmflow/internal/domain/campaign/model"
+	campaignrepo "firmflow/internal/domain/campaign/repository"
+	campaignsvc "firmflow/internal/domain/campaign/service"
 	devicemodel "firmflow/internal/domain/device/model"
 	devicerepo "firmflow/internal/domain/device/repository"
 	devicesvc "firmflow/internal/domain/device/service"
@@ -25,6 +30,7 @@ import (
 	"firmflow/internal/platform/logger"
 	"firmflow/internal/platform/mailer"
 	"firmflow/internal/platform/storage"
+	"firmflow/internal/transport/devotcp"
 	"firmflow/internal/transport/http/handlers"
 	"firmflow/internal/transport/http/routes"
 
@@ -34,11 +40,14 @@ import (
 )
 
 type App struct {
-	Config     *config.Config
-	Logger     *logrus.Logger
-	DB         *gorm.DB
-	Container  *Container
-	HTTPServer *http.Server
+	Config              *config.Config
+	Logger              *logrus.Logger
+	DB                  *gorm.DB
+	Container           *Container
+	HTTPServer          *http.Server
+	cancelCampaignSched context.CancelFunc
+	cancelDeviceOTA     context.CancelFunc
+	otaWG               *sync.WaitGroup
 }
 
 type Container struct {
@@ -49,6 +58,7 @@ type Container struct {
 	DeviceHandler   *handlers.DeviceHandler
 	DeviceService   *devicesvc.Service
 	FirmwareHandler *handlers.FirmwareHandler
+	CampaignHandler *handlers.CampaignHandler
 	Authorizer      *rbacsvc.Authorizer
 }
 
@@ -83,7 +93,6 @@ func New() (*App, error) {
 
 	deviceRepository := devicerepo.New(db)
 	deviceService := devicesvc.New(rbacRepository, authRepository, rbacAuthorizer, deviceRepository)
-	deviceHandler := handlers.NewDeviceHandler(deviceService)
 
 	objectStore, err := storage.NewLocalObjectStore(cfg.Storage.BasePath)
 	if err != nil {
@@ -106,6 +115,18 @@ func New() (*App, error) {
 	)
 	firmwareHandler := handlers.NewFirmwareHandler(firmwareService)
 
+	campaignRepository := campaignrepo.New(db)
+	campaignService := campaignsvc.New(
+		rbacRepository,
+		authRepository,
+		rbacAuthorizer,
+		campaignRepository,
+		firmwareRepository,
+		deviceRepository,
+	)
+	campaignHandler := handlers.NewCampaignHandler(campaignService)
+	deviceHandler := handlers.NewDeviceHandler(deviceService, campaignService)
+
 	container := &Container{
 		HealthHandler:   healthHandler,
 		AuthHandler:     authHandler,
@@ -114,6 +135,7 @@ func New() (*App, error) {
 		DeviceHandler:   deviceHandler,
 		DeviceService:   deviceService,
 		FirmwareHandler: firmwareHandler,
+		CampaignHandler: campaignHandler,
 		Authorizer:      rbacAuthorizer,
 	}
 	routes.Register(engine, routes.Deps{
@@ -123,6 +145,7 @@ func New() (*App, error) {
 		Project:      container.ProjectHandler,
 		Device:       container.DeviceHandler,
 		Firmware:     container.FirmwareHandler,
+		Campaign:     container.CampaignHandler,
 		DeviceAuthMW: middleware.RequireDeviceAuth(deviceRepository),
 		Authorizer:   container.Authorizer,
 	})
@@ -135,12 +158,19 @@ func New() (*App, error) {
 				projectmodel.Migrator{},
 				devicemodel.Migrator{},
 				firmwaremodel.Migrator{},
+				campaignmodel.Migrator{},
 			},
 		}
 		if err := database.RunMigrations(context.Background(), db, migrator, log); err != nil {
 			return nil, fmt.Errorf("run migrations: %w", err)
 		}
 	}
+
+	schedCtx, cancelSched := context.WithCancel(context.Background())
+	go campaignsvc.RunScheduler(schedCtx, log, campaignService, 30*time.Second)
+
+	var cancelDeviceOTA context.CancelFunc
+	var otaWG *sync.WaitGroup
 
 	server := &http.Server{
 		Addr:         ":" + cfg.HTTP.Port,
@@ -149,13 +179,54 @@ func New() (*App, error) {
 		WriteTimeout: cfg.HTTP.WriteTimeout,
 	}
 
+	if addr := strings.TrimSpace(cfg.DeviceOTA.TCPListenAddr); addr != "" {
+		wg := &sync.WaitGroup{}
+		otaWG = wg
+		otaHandler := &devotcp.Handler{
+			Log:                   log,
+			DeviceRepo:            deviceRepository,
+			DeviceSvc:             deviceService,
+			CampaignSvc:           campaignService,
+			FirmwareSvc:           firmwareService,
+			PublicDownloadBaseURL: cfg.DeviceOTA.PublicDownloadBaseURL,
+			TokenTTL:              cfg.DeviceOTA.DownloadTokenTTL,
+		}
+		otaCtx, cancelOTA := context.WithCancel(context.Background())
+		cancelDeviceOTA = cancelOTA
+		otaWG.Add(1)
+		go func() {
+			defer otaWG.Done()
+			if err := devotcp.Serve(otaCtx, log, addr, otaHandler); err != nil {
+				log.WithError(err).Error("device OTA tcp server exited")
+			}
+		}()
+	}
+
 	return &App{
-		Config:     cfg,
-		Logger:     log,
-		DB:         db,
-		Container:  container,
-		HTTPServer: server,
+		Config:              cfg,
+		Logger:              log,
+		DB:                  db,
+		Container:           container,
+		HTTPServer:          server,
+		cancelCampaignSched: cancelSched,
+		cancelDeviceOTA:     cancelDeviceOTA,
+		otaWG:               otaWG,
 	}, nil
+}
+
+func (a *App) StopSchedulers() {
+	if a.cancelCampaignSched != nil {
+		a.cancelCampaignSched()
+	}
+}
+
+func (a *App) StopOTA() {
+	if a.cancelDeviceOTA != nil {
+		a.cancelDeviceOTA()
+	}
+	if a.otaWG != nil {
+		a.otaWG.Wait()
+	}
 }
 
 func (a *App) Close() error {

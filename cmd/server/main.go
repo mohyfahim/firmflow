@@ -35,6 +35,8 @@ func main() {
 	defer cancel()
 
 	app.Logger.Info("shutting down http server")
+	app.StopSchedulers()
+	app.StopOTA()
 	if err := app.HTTPServer.Shutdown(ctx); err != nil {
 		app.Logger.WithError(err).Error("http server graceful shutdown failed")
 		return

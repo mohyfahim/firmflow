@@ -200,8 +200,8 @@ func mapDeleteProjectError(err error) error {
 	if err == nil {
 		return nil
 	}
-	if err.Error() == "active_or_scheduled_campaigns" {
-		return apperrors.New("campaigns_active", "cannot delete project while campaigns are active or scheduled", 409, nil)
+	if err.Error() == "blocking_campaigns" {
+		return apperrors.New("campaigns_active", "cannot delete project while OTA campaigns are in a non-terminal state (not completed or cancelled)", 409, nil)
 	}
 	return err
 }

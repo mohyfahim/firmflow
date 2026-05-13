@@ -1,0 +1,26 @@
+meta {
+  name: campaigns-create
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{url}}/api/v1/projects/{{project_id}}/campaigns
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "Bruno test rollout",
+    "firmware_id": "{{firmware_id}}",
+    "rollout_kind": "immediate",
+    "device_group_ids": [],
+    "explicit_device_ids": ["{{device_id}}"]
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

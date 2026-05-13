@@ -20,6 +20,7 @@ func (Migrator) Migrate(_ context.Context, db *gorm.DB) error {
 		&DeviceBlockEvent{},
 		&DeviceGroup{},
 		&DeviceGroupMembership{},
+		&OtaDownloadToken{},
 	); err != nil {
 		return err
 	}

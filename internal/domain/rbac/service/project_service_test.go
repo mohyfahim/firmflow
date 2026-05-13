@@ -3,9 +3,11 @@ package service
 import (
 	"context"
 	"testing"
+	"time"
 
 	authmodel "firmflow/internal/domain/auth/model"
 	authrepo "firmflow/internal/domain/auth/repository"
+	campaignmodel "firmflow/internal/domain/campaign/model"
 	projectmodel "firmflow/internal/domain/project/model"
 	rbacmodel "firmflow/internal/domain/rbac/model"
 	rbacperm "firmflow/internal/domain/rbac/permission"
@@ -33,6 +35,10 @@ func setupRBACTestDB(t *testing.T) *gorm.DB {
 	}
 	pm := projectmodel.Migrator{}
 	if err := pm.Migrate(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+	cm := campaignmodel.Migrator{}
+	if err := cm.Migrate(ctx, db); err != nil {
 		t.Fatal(err)
 	}
 	return db
@@ -209,9 +215,17 @@ func TestDeleteBlockedByActiveCampaign(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := rbacR.DB().WithContext(ctx).Create(&projectmodel.Campaign{
-		ProjectID: proj.ID,
-		Status:    "active",
+	now := time.Now().UTC()
+	if err := rbacR.DB().WithContext(ctx).Create(&campaignmodel.Campaign{
+		ProjectID:         proj.ID,
+		Name:              "blocking",
+		FirmwareID:        uuid.New(),
+		RolloutKind:       campaignmodel.RolloutKindImmediate,
+		Status:            campaignmodel.StatusActive,
+		TargetDeviceCount: 0,
+		CreatedByUserID:   ownerID,
+		CreatedAt:         now,
+		UpdatedAt:         now,
 	}).Error; err != nil {
 		t.Fatal(err)
 	}
