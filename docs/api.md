@@ -228,7 +228,7 @@ When `DEVICE_OTA_TCP_ADDR` is set (e.g. `:9001`), the API process also listens o
 
 **Session**: connect → **auth frame** (raw `Device` token in payload) → server **auth OK** or **error frame** → one or more **poll** / **report** frames on the same connection.
 
-**Frames**: 16-byte header (magic `FRM1`, version `1`, message type, request id, payload length) + payload. Message types and payload layout are defined in `internal/transport/devotcp/protocol.go`.
+**Wire specification**: see **[Device TCP protocol](device-tcp-protocol.md)** (frame layout, message IDs, payloads, error codes). Source: `internal/transport/devotcp/protocol.go` and `handler.go`.
 
 **Poll** (after auth): updates `last_seen_at`, logs `ota_poll`, resolves campaign offer (pending→offered as for HTTP), and when an update exists returns `update_available`, target version, raw 32-byte SHA-256 checksum, campaign and firmware UUIDs, download URL/path, and token expiry (Unix seconds). **Report** carries `campaign_id` and status (`downloaded` / `installed` / `failed`) plus optional error fields; server updates assignment state idempotently and logs `ota_report`.
 

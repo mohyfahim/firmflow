@@ -1,6 +1,6 @@
 # Firmflow Backend Architecture
 
-See also: [HTTP API reference](api.md) and [Developer onboarding](onboarding.md).
+See also: [HTTP API reference](api.md), [Developer onboarding](onboarding.md), and [Device TCP protocol](device-tcp-protocol.md).
 
 ## Architectural Style
 

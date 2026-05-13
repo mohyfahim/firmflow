@@ -1,6 +1,6 @@
 # Developer onboarding (Firmflow backend)
 
-This document is derived from the current codebase layout and conventions. Read it alongside [HTTP API reference](api.md) and [Architecture](architecture.md).
+This document is derived from the current codebase layout and conventions. Read it alongside [HTTP API reference](api.md), [Architecture](architecture.md), and [Device TCP protocol](device-tcp-protocol.md) if you integrate firmware over TCP.
 
 ## What you are building
 
@@ -27,7 +27,7 @@ Makefile shortcuts: `make tidy`, `make test`, `make fmt`, `make lint` — see re
 | `internal/database` | Postgres connection + migration runner hook. |
 | `internal/middleware` | `RequireAuth` (JWT), `RequireDeviceAuth` (hashed device token), `RequireProjectPermission`, CORS, logging, panic recovery, `ErrorHandler`. |
 | `internal/transport/http` | `routes/routes.go` is the **route table**; `handlers/*` are thin Gin handlers calling domain services. |
-| `internal/transport/devotcp` | Optional **binary TCP** OTA protocol (`protocol.go`, `handler.go`, `server.go`). |
+| `internal/transport/devotcp` | Optional **binary TCP** OTA protocol (`protocol.go`, `handler.go`, `server.go`). **Wire format**: [docs/device-tcp-protocol.md](device-tcp-protocol.md). |
 | `internal/domain/*` | One folder per bounded context: `model` (GORM structs + `Migrator` where present), `repository` (GORM queries), `service` (rules + authz orchestration). |
 | `internal/common` | API errors (`apperrors`), JSON envelope helpers, pagination, JSON validation helpers. |
 | `internal/platform` | Logger, mailer noop, **local object store** under `storage`. |
@@ -109,6 +109,7 @@ Folders: `auth`, `me`, `health`, `projects`, `devices`, `firmware`, **`campaigns
 
 - [docs/api.md](api.md) — full route list and bodies.
 - [docs/architecture.md](architecture.md) — design intent and package boundaries.
+- [docs/device-tcp-protocol.md](device-tcp-protocol.md) — TCP OTA wire format for firmware clients.
 - `README.md` — Make targets and quick start.
 
 If something in this file drifts from code, treat the **source of truth** as `internal/bootstrap/app.go` and `internal/transport/http/routes/routes.go`.

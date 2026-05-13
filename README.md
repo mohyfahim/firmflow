@@ -41,6 +41,7 @@ Richer fleet analytics and dashboards are still ahead; see `docs/api.md` for API
 ## Documentation
 
 - [docs/api.md](docs/api.md) — HTTP routes and device/OTA behavior.
+- [docs/device-tcp-protocol.md](docs/device-tcp-protocol.md) — binary TCP OTA frame layout and payloads (MCU integration).
 - [docs/architecture.md](docs/architecture.md) — layering and package roles.
 - [docs/onboarding.md](docs/onboarding.md) — onboarding from the codebase (where to change things, auth, OTA flows, Bruno).
 
