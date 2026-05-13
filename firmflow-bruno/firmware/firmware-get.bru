@@ -1,0 +1,16 @@
+meta {
+  name: firmware-get
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{url}}/api/v1/projects/{{project_id}}/firmwares/{{firmware_id}}
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

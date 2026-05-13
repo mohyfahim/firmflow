@@ -33,8 +33,9 @@ The repo includes:
   - **Projects** and **project-scoped RBAC** (`/api/v1/projects`, `/api/v1/projects/:projectID/...`)
   - **Custom roles** (list with catalog, CRUD) and **members** under each project
   - **Devices**: device types (catalog + custom), device groups, filtered device list, registration, twin, block/unblock, token rotation, **bulk** actions, and **device-facing** poll/report with `Authorization: Device <token>`
+  - **Firmware**: multipart upload (SHA-256, size limits), metadata + compatible device types, version/semver handling, **local object storage** (swappable for S3-style backends), authenticated **download** stream (no public URLs)
 
-Firmware artifacts, OTA campaigns, and richer fleet analytics are still ahead; permission keys and stubs exist where noted in `docs/api.md`.
+OTA campaigns and richer fleet analytics are still ahead; permission keys and stubs exist where noted in `docs/api.md`.
 
 ## Local Development
 
@@ -104,7 +105,7 @@ Firmware artifacts, OTA campaigns, and richer fleet analytics are still ahead; p
 
 ### Projects, RBAC, and devices (implemented)
 
-Multi-tenant workspaces are **projects**. Under `/api/v1/projects/:projectID`, middleware checks membership and a **permission key** per route (e.g. `project.read`, `member.invite`, `device.read`, `device.assign_group`). Devices live in a project; **device auth** for field agents uses a separate header on `/api/v1/device/*` (see [docs/api.md](docs/api.md)).
+Multi-tenant workspaces are **projects**. Under `/api/v1/projects/:projectID`, middleware checks membership and a **permission key** per route (e.g. `project.read`, `member.invite`, `device.read`, `firmware.read`, `firmware.upload`). Devices live in a project; **device auth** for field agents uses a separate header on `/api/v1/device/*` (see [docs/api.md](docs/api.md)).
 
 ### Authentication for API clients
 
@@ -127,9 +128,10 @@ The [Bruno](https://www.usebruno.com/) API collection lives in `firmflow-bruno/`
 - `access_token` (from `data.access_token`)
 - `project_id` (from create/list project responses)
 - For device flows: `device_type_id`, `device_id`, `group_id`, and after **Register device** or **Rotate token**, `device_token` for **Device poll** / **Device report** (`Authorization: Device …` is set in those requests).
+- For firmware: `firmware_id` after upload/list; multipart **Upload firmware** uses form fields `version`, `changelog`, `device_type_ids` (JSON array string), and `file`.
 
-Folders mirror major areas: `auth`, `me`, `health`, `projects`, `devices`.
+Folders mirror major areas: `auth`, `me`, `health`, `projects`, `devices`, `firmware`.
 
 ### Roadmap
 
-Firmware storage, OTA campaigns, and deeper analytics/dashboards are next; they will follow the same layering and RBAC patterns.
+OTA campaigns and deeper analytics/dashboards are next; they will follow the same layering and RBAC patterns.

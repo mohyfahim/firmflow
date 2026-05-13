@@ -4,22 +4,27 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"firmflow/internal/config"
 	"firmflow/internal/database"
 	authmodel "firmflow/internal/domain/auth/model"
 	authrepo "firmflow/internal/domain/auth/repository"
 	authsvc "firmflow/internal/domain/auth/service"
+	devicemodel "firmflow/internal/domain/device/model"
+	devicerepo "firmflow/internal/domain/device/repository"
+	devicesvc "firmflow/internal/domain/device/service"
+	firmwaremodel "firmflow/internal/domain/firmware/model"
+	firmwarerepo "firmflow/internal/domain/firmware/repository"
+	firmwaresvc "firmflow/internal/domain/firmware/service"
 	projectmodel "firmflow/internal/domain/project/model"
 	rbacmodel "firmflow/internal/domain/rbac/model"
 	rbacrepo "firmflow/internal/domain/rbac/repository"
 	rbacsvc "firmflow/internal/domain/rbac/service"
-	devicemodel "firmflow/internal/domain/device/model"
-	devicerepo "firmflow/internal/domain/device/repository"
-	devicesvc "firmflow/internal/domain/device/service"
 	"firmflow/internal/middleware"
 	"firmflow/internal/platform/logger"
 	"firmflow/internal/platform/mailer"
+	"firmflow/internal/platform/storage"
 	"firmflow/internal/transport/http/handlers"
 	"firmflow/internal/transport/http/routes"
 
@@ -37,13 +42,14 @@ type App struct {
 }
 
 type Container struct {
-	HealthHandler  *handlers.HealthHandler
-	AuthHandler    *handlers.AuthHandler
-	AuthService    *authsvc.Service
-	ProjectHandler *handlers.ProjectHandler
-	DeviceHandler  *handlers.DeviceHandler
-	DeviceService  *devicesvc.Service
-	Authorizer     *rbacsvc.Authorizer
+	HealthHandler   *handlers.HealthHandler
+	AuthHandler     *handlers.AuthHandler
+	AuthService     *authsvc.Service
+	ProjectHandler  *handlers.ProjectHandler
+	DeviceHandler   *handlers.DeviceHandler
+	DeviceService   *devicesvc.Service
+	FirmwareHandler *handlers.FirmwareHandler
+	Authorizer      *rbacsvc.Authorizer
 }
 
 func New() (*App, error) {
@@ -79,23 +85,46 @@ func New() (*App, error) {
 	deviceService := devicesvc.New(rbacRepository, authRepository, rbacAuthorizer, deviceRepository)
 	deviceHandler := handlers.NewDeviceHandler(deviceService)
 
+	objectStore, err := storage.NewLocalObjectStore(cfg.Storage.BasePath)
+	if err != nil {
+		return nil, fmt.Errorf("storage: %w", err)
+	}
+	if p := strings.ToLower(strings.TrimSpace(cfg.Storage.Provider)); p != "" && p != "local" {
+		return nil, fmt.Errorf("unsupported STORAGE_PROVIDER %q (only local is implemented)", cfg.Storage.Provider)
+	}
+
+	firmwareRepository := firmwarerepo.New(db)
+	firmwareService := firmwaresvc.New(
+		rbacRepository,
+		authRepository,
+		rbacAuthorizer,
+		firmwareRepository,
+		deviceRepository,
+		objectStore,
+		cfg.Storage.FirmwareMaxUploadBytes,
+		cfg.Storage.Provider,
+	)
+	firmwareHandler := handlers.NewFirmwareHandler(firmwareService)
+
 	container := &Container{
-		HealthHandler:  healthHandler,
-		AuthHandler:    authHandler,
-		AuthService:    authService,
-		ProjectHandler: projectHandler,
-		DeviceHandler:  deviceHandler,
-		DeviceService:  deviceService,
-		Authorizer:     rbacAuthorizer,
+		HealthHandler:   healthHandler,
+		AuthHandler:     authHandler,
+		AuthService:     authService,
+		ProjectHandler:  projectHandler,
+		DeviceHandler:   deviceHandler,
+		DeviceService:   deviceService,
+		FirmwareHandler: firmwareHandler,
+		Authorizer:      rbacAuthorizer,
 	}
 	routes.Register(engine, routes.Deps{
-		Health:     container.HealthHandler,
-		Auth:       container.AuthHandler,
-		AuthMW:     middleware.RequireAuth(container.AuthService),
-		Project:    container.ProjectHandler,
-		Device:     container.DeviceHandler,
+		Health:       container.HealthHandler,
+		Auth:         container.AuthHandler,
+		AuthMW:       middleware.RequireAuth(container.AuthService),
+		Project:      container.ProjectHandler,
+		Device:       container.DeviceHandler,
+		Firmware:     container.FirmwareHandler,
 		DeviceAuthMW: middleware.RequireDeviceAuth(deviceRepository),
-		Authorizer: container.Authorizer,
+		Authorizer:   container.Authorizer,
 	})
 
 	if cfg.DB.AutoMigrate {
@@ -105,6 +134,7 @@ func New() (*App, error) {
 				rbacmodel.Migrator{},
 				projectmodel.Migrator{},
 				devicemodel.Migrator{},
+				firmwaremodel.Migrator{},
 			},
 		}
 		if err := database.RunMigrations(context.Background(), db, migrator, log); err != nil {

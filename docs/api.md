@@ -192,6 +192,32 @@ Blocked devices or revoked/disabled tokens receive `401` / `403` with stable err
 
 ---
 
+## Firmware (`/api/v1/projects/:projectID/firmwares`)
+
+Project-scoped firmware binaries with metadata. Binaries are stored via an internal **object store** (local filesystem in development); API responses never expose filesystem paths—only opaque storage metadata and `checksum_sha256`.
+
+| Method | Path | Body / query | Permission |
+|--------|------|----------------|------------|
+| GET | `/firmwares` | Pagination `page`, `page_size` (max 100), `sort`: `created_at`, `-created_at` (default), `version`, `-version` (semver columns when parseable, then `version_normalized`; non-semver rows sort after semver for `version` / `-version`) | `firmware.read` |
+| POST | `/firmwares` | **multipart**: `file` (required), `version` (required), `changelog` (optional), `device_type_ids` (required JSON array of UUID strings, e.g. `["uuid"]`) — at least one compatible device type (predefined or project custom) | `firmware.upload` |
+| GET | `/firmwares/:firmwareID` | — (metadata + `compatible_device_type_ids`; no raw storage path) | `firmware.read` |
+| GET | `/firmwares/:firmwareID/download` | — streams `application/octet-stream`; headers `X-Checksum-Sha256`, `Content-Length` | `firmware.read` |
+| DELETE | `/firmwares/:firmwareID` | — soft-deletes row and removes blob from object store (best-effort) | `firmware.upload` |
+
+**Versioning**
+
+- **`version`**: stored exactly as provided (trimmed for leading/trailing spaces in input validation only); shown in API as uploaded.
+- **`version_normalized`**: `strings.ToLower(strings.TrimSpace(version))` used for **duplicate detection** per project (partial unique index where `deleted_at IS NULL`). Example: `1.0.0` and `  1.0.0  ` collide.
+- **Semver**: when the string parses as [SemVer 2.0.0](https://semver.org/) (via `github.com/Masterminds/semver`), `semver_major` / `semver_minor` / `semver_patch` and `semver_prerelease` are populated for list ordering. Non-semver strings (e.g. `REL-2024-11`) still persist; those columns stay null and sort after semver tuples for `sort=version` / `sort=-version` (best-effort; prerelease ordering vs release is not fully modeled in SQL).
+
+**Upload limits**: max body size is capped by `FIRMWARE_MAX_UPLOAD_BYTES` (default 64 MiB; see `.env.example`). Server computes **SHA-256** after size-limited buffering, then writes the object with a deterministic internal key `projects/{projectID}/firmware/{firmwareID}/blob`.
+
+**Errors**: duplicate normalized version → **`409`** `firmware_version_exists`. Oversized upload → **`400`**.
+
+**Audit**: `firmware_uploaded`, `firmware_downloaded`, `firmware_deleted` on the project audit stream (actor, firmware id, checksum/size on upload/download).
+
+---
+
 ## Permission keys (reference)
 
-Registered keys cover project/member/role management, **devices** (`device.read`, `device.create`, `device.update`, `device.block`, `device.token.rotate`, `device.assign_group`), `audit.read`, `dashboard.read`, and reserved keys for firmware/campaign modules (`firmware.*`, `campaign.*`). See `internal/domain/rbac/permission/registry.go` for the canonical list.
+Registered keys cover project/member/role management, **devices** (`device.read`, `device.create`, `device.update`, `device.block`, `device.token.rotate`, `device.assign_group`), **firmware** (`firmware.read`, `firmware.upload`), `audit.read`, `dashboard.read`, and reserved keys for campaign modules (`campaign.*`). See `internal/domain/rbac/permission/registry.go` for the canonical list.

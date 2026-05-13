@@ -65,9 +65,10 @@ type MailConfig struct {
 }
 
 type StorageConfig struct {
-	Provider string
-	BasePath string
-	Bucket   string
+	Provider               string
+	BasePath               string
+	Bucket                 string
+	FirmwareMaxUploadBytes int64
 }
 
 type RateLimitConfig struct {
@@ -120,9 +121,10 @@ func Load() (*Config, error) {
 			FromAddress: getEnv("MAIL_FROM_ADDRESS", "noreply@firmflow.local"),
 		},
 		Storage: StorageConfig{
-			Provider: getEnv("STORAGE_PROVIDER", "local"),
-			BasePath: getEnv("STORAGE_BASE_PATH", "./tmp/storage"),
-			Bucket:   getEnv("STORAGE_BUCKET", ""),
+			Provider:               getEnv("STORAGE_PROVIDER", "local"),
+			BasePath:               getEnv("STORAGE_BASE_PATH", "./tmp/storage"),
+			Bucket:                 getEnv("STORAGE_BUCKET", ""),
+			FirmwareMaxUploadBytes: getEnvInt64("FIRMWARE_MAX_UPLOAD_BYTES", 64<<20),
 		},
 		RateLimit: RateLimitConfig{
 			Enabled:           getEnvBool("RATE_LIMIT_ENABLED", true),
@@ -143,12 +145,27 @@ func (c *Config) Validate() error {
 	if c.DB.Host == "" || c.DB.User == "" || c.DB.Name == "" {
 		return fmt.Errorf("database host, user, and name are required")
 	}
+	if c.Storage.FirmwareMaxUploadBytes < 0 {
+		return fmt.Errorf("FIRMWARE_MAX_UPLOAD_BYTES must not be negative")
+	}
 	return nil
 }
 
 func getEnv(key, fallback string) string {
 	val := os.Getenv(key)
 	if val == "" {
+		return fallback
+	}
+	return val
+}
+
+func getEnvInt64(key string, fallback int64) int64 {
+	raw := os.Getenv(key)
+	if raw == "" {
+		return fallback
+	}
+	val, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil {
 		return fallback
 	}
 	return val

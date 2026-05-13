@@ -10,13 +10,14 @@ import (
 )
 
 type Deps struct {
-	Health     *handlers.HealthHandler
-	Auth       *handlers.AuthHandler
-	AuthMW     gin.HandlerFunc
-	Project    *handlers.ProjectHandler
-	Device     *handlers.DeviceHandler
+	Health       *handlers.HealthHandler
+	Auth         *handlers.AuthHandler
+	AuthMW       gin.HandlerFunc
+	Project      *handlers.ProjectHandler
+	Device       *handlers.DeviceHandler
+	Firmware     *handlers.FirmwareHandler
 	DeviceAuthMW gin.HandlerFunc
-	Authorizer *rbacsvc.Authorizer
+	Authorizer   *rbacsvc.Authorizer
 }
 
 func Register(router *gin.Engine, deps Deps) {
@@ -100,6 +101,12 @@ func Register(router *gin.Engine, deps Deps) {
 		pg.POST("/devices/:deviceID/block", middleware.RequireProjectPermission(deps.Authorizer, rbacperm.DeviceBlock), deps.Device.BlockDevice)
 		pg.POST("/devices/:deviceID/unblock", middleware.RequireProjectPermission(deps.Authorizer, rbacperm.DeviceBlock), deps.Device.UnblockDevice)
 		pg.POST("/devices/:deviceID/rotate-token", middleware.RequireProjectPermission(deps.Authorizer, rbacperm.DeviceTokenRotate), deps.Device.RotateDeviceToken)
+
+		pg.GET("/firmwares", middleware.RequireProjectPermission(deps.Authorizer, rbacperm.FirmwareRead), deps.Firmware.ListFirmware)
+		pg.POST("/firmwares", middleware.RequireProjectPermission(deps.Authorizer, rbacperm.FirmwareUpload), deps.Firmware.UploadFirmware)
+		pg.GET("/firmwares/:firmwareID", middleware.RequireProjectPermission(deps.Authorizer, rbacperm.FirmwareRead), deps.Firmware.GetFirmware)
+		pg.GET("/firmwares/:firmwareID/download", middleware.RequireProjectPermission(deps.Authorizer, rbacperm.FirmwareRead), deps.Firmware.DownloadFirmware)
+		pg.DELETE("/firmwares/:firmwareID", middleware.RequireProjectPermission(deps.Authorizer, rbacperm.FirmwareUpload), deps.Firmware.DeleteFirmware)
 	}
 
 	// Device-facing endpoints (device auth only).

@@ -41,3 +41,7 @@ func Forbidden() AppError {
 func NotFound(message string) AppError {
 	return New("not_found", message, http.StatusNotFound, nil)
 }
+
+func Conflict(code, message string, details interface{}) AppError {
+	return New(code, message, http.StatusConflict, details)
+}

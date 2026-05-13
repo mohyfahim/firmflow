@@ -1,0 +1,16 @@
+meta {
+  name: firmware-list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{url}}/api/v1/projects/{{project_id}}/firmwares?page=1&page_size=20&sort=-created_at
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
