@@ -13,9 +13,21 @@ post {
 body:json {
   {
     "email": "user@example.com",
-    "password": "ChangeMe123456",
+    "password": "ChangeMe!23456",
     "totp_code": "",
     "recovery_code": ""
+  }
+}
+
+script:post-response {
+  if (res.getStatus() == 200) {
+    let body = res.getBody();
+    let access_token = body.data.access_token;
+    let refresh_token = body.data.refresh_token;
+    console.log("access token", access_token);
+    console.log("refresh token", refresh_token);
+    bru.setEnvVar("refresh_token", refresh_token);
+    bru.setEnvVar("access_token", access_token);
   }
 }
 

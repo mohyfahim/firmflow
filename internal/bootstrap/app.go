@@ -84,7 +84,7 @@ func New() (*App, error) {
 
 	healthHandler := handlers.NewHealthHandler(db)
 	authRepository := authrepo.New(db)
-	authService := authsvc.New(cfg.Auth, authRepository, mailer.NoopMailer{})
+	authService := authsvc.New(cfg.Auth, authRepository, mailer.NoopMailer{}, log)
 	authHandler := handlers.NewAuthHandler(authService)
 	rbacRepository := rbacrepo.New(db)
 	rbacAuthorizer := rbacsvc.NewAuthorizer(rbacRepository)

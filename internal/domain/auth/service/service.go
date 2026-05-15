@@ -16,6 +16,7 @@ import (
 	"firmflow/internal/platform/mailer"
 
 	"github.com/google/uuid"
+	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )
 
@@ -27,6 +28,7 @@ type Service struct {
 	mailer      mailer.Mailer
 	jwt         *security.TokenManager
 	totpManager *security.TOTPManager
+	log         *logrus.Logger
 }
 
 type SessionMeta struct {
@@ -43,13 +45,14 @@ type TokenPair struct {
 	TwoFactorRequired bool      `json:"two_factor_required"`
 }
 
-func New(cfg config.AuthConfig, repo *repository.Repository, mailer mailer.Mailer) *Service {
+func New(cfg config.AuthConfig, repo *repository.Repository, mailer mailer.Mailer, log *logrus.Logger) *Service {
 	return &Service{
 		cfg:         cfg,
 		repo:        repo,
 		mailer:      mailer,
 		jwt:         security.NewTokenManager(cfg.JWTIssuer, cfg.JWTSecret, cfg.AccessTokenTTL),
 		totpManager: security.NewTOTPManager(cfg.JWTIssuer, cfg.TOTPEncryptionKey),
+		log:         log,
 	}
 }
 
@@ -81,6 +84,12 @@ func (s *Service) Register(ctx context.Context, email, password string) error {
 		TokenHash: security.HashToken(rawToken),
 		ExpiresAt: time.Now().UTC().Add(24 * time.Hour),
 	}
+	s.log.WithFields(logrus.Fields{
+		"token":   rawToken,
+		"user_id": user.ID,
+		"email":   email,
+	}).Debug("email verification token created")
+
 	if err := s.repo.CreateEmailVerificationToken(ctx, token); err != nil {
 		return err
 	}
@@ -212,6 +221,12 @@ func (s *Service) ForgotPassword(ctx context.Context, email string) error {
 		TokenHash: security.HashToken(raw),
 		ExpiresAt: time.Now().UTC().Add(1 * time.Hour),
 	}
+	s.log.WithFields(logrus.Fields{
+		"token":   raw,
+		"user_id": user.ID,
+		"email":   email,
+	}).Debug("password reset token created")
+
 	if err := s.repo.CreateResetToken(ctx, token); err != nil {
 		return err
 	}
@@ -357,6 +372,13 @@ func (s *Service) BeginEnable2FA(ctx context.Context, userID uuid.UUID, password
 	if err != nil {
 		return nil, err
 	}
+	s.log.WithFields(logrus.Fields{
+		"user_id": user.ID,
+		"email":   user.Email,
+		"secret":  secret,
+		"uri":     uri,
+		"qr":      qr,
+	}).Debug("2fa generated")
 	enc, err := s.totpManager.Encrypt(secret)
 	if err != nil {
 		return nil, err

@@ -12,6 +12,7 @@ import (
 	"firmflow/internal/platform/mailer"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -26,7 +27,7 @@ func TestRequireAuthUnauthorizedWithoutToken(t *testing.T) {
 		RefreshTokenTTL:   time.Hour,
 		BcryptCost:        4,
 		TOTPEncryptionKey: "01234567890123456789012345678901",
-	}, authrepo.New(db), mailer.NoopMailer{})
+	}, authrepo.New(db), mailer.NoopMailer{}, logrus.New())
 
 	r := gin.New()
 	r.Use(RequireAuth(svc))
